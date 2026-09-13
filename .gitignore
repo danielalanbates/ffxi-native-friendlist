@@ -1,0 +1,19 @@
+# Local configuration and credentials -- never commit
+addon/nativefriends/settings.txt
+*.env
+.env*
+*.ini
+secrets/
+
+# Client memory dumps are Square Enix copyrighted binaries -- never commit
+*.mem
+*.dll
+*.dmp
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS / editors
+.DS_Store
+*.swp
