@@ -7,9 +7,11 @@ The menu updates live when friends log in or out.
 
 ![Online friend in the native menu](docs/screenshots/04-accepted-online-with-zone.png)
 
-Verified 2026-09-12 with two real characters on a local LandSandBoat server. The request,
-accept, online, logout, login, remove, and re-request flows were all checked in the native menu
-(see [docs/VERIFICATION.md](docs/VERIFICATION.md)).
+Verified on a local LandSandBoat server with two real characters:
+- **2026-09-12:** the list itself, with live presence.
+- **2026-09-13:** full retail parity. That covers PlayOnline **Messages**, friend requests answered with the game's own
+  **Accept / Decline** dialog, **Send Message**, **Away** status icons, and the new-mail indicator.
+  See [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 ## How it works
 
@@ -20,7 +22,8 @@ exists. So:
 | Piece | What it does |
 |---|---|
 | `addon/nativefriends` (Ashita v4) | Redirects FFXiMain's per-slot friend fetch to a buffer it fills with correctly laid-out 0x100-byte entries, then calls the menu's own rebuild routine so changes appear live. Hook sites are found by byte signature. |
-| `server/friendsd.py` | Small HTTP service that runs beside the LSB database. It stores friendships in its own `nf_friends` table and reads presence from LSB's `accounts_sessions`. |
+| `server/friendsd.py` | Small HTTP service that runs beside the LSB database. It stores friendships (`nf_friends`), online status (`nf_status`) and PlayOnline mail (`nf_mail`), and reads presence from LSB's `accounts_sessions`. |
+| `addon/nativefriends/nf_mail.lua` | Turns on polcore's message file layer, delivers server mail into the game's inbox folder, uploads the outbox, and replaces PlayOnline's network message operations with local ones. |
 | `tools/headless_friend.py` | Logs a second character in with LSB's HeadlessXI, so two-player tests need only one game client. |
 
 How the client internals were found, with every address and field: [docs/CLIENT_INTERNALS.md](docs/CLIENT_INTERNALS.md).

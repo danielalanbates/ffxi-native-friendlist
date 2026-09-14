@@ -42,8 +42,10 @@ G = [0x217d500]      (signature A1 ?? ?? ?? ?? 66 8B 80 32 01 00 00 C3 → [+1])
 ```
 
 The fetch call site signature is `8B442404563DC80000007D0D8B4C240C5150E8`; the `E8` is at +0x12.
-The addon repoints that `call` to a 45-byte stub that copies record *i* from its own buffer (or
-returns -1), and restores the original call on unload.
+The addon repoints that `call` to a stub that copies record *i* from its own buffer, or returns a zeroed
+entry with result 0 for unused slots, and restores the original call on unload. Never return a negative result
+here: FFXiMain treats it as a PlayOnline error and queues an error dialog per slot. Polcore's own table slot 0x29C
+is also redirected, to a 0xB0-byte copy of the same stub, for direct callers such as the message recipient lookup.
 
 Live refresh uses the row builder signature `83EC145355568BF133DB57895E3CC6464420`. The open
 menu instance comes from `83EC1853568BF18B0D????????33DB57` → `[[+9]]` (0 when closed).
@@ -93,3 +95,20 @@ name, and zone name; see screenshot 04.
 Case 1 builds a `/tell <name>` line from row +0x3c (entry +0xB4) through the chat input object
 `[0x22cdf98]` vtable +0x24. Cases 2 and 3 invite to party or linkshell using ids at row +0x08 and
 +0x0C (entry +0x00). Case 4 is 0x1d87da0, probably the delete-confirm path into PlayOnline.
+
+## PlayOnline messages (2026-09-13)
+
+- polcore's "network" file layer is local CRT file I/O on worker threads, gated by a flag set in common-function-table
+  slot **0xE5C** (normally called by the PlayOnline Viewer). Once on, the Messages window lists
+  `PlayOnlineViewer\pub\home00\msg\r\b\` (inbox) and sends by writing `msg\O\m\` (outbox).
+- A message file's **name** is polcore's base64 variant (alphabet `TSG8IncW3HFKokOg79qzeCmZs2yBYEQVAUxR5rbwi4P@jMDLtpvad0f_J1hlN6uX`)
+  of the 0x48-byte header; the **contents** are `subject 0x07 text 0x00`.
+- Header: +0x00 u64 from id, +0x08 u64 to id, +0x10 from name, +0x20 to name, +0x30 sequence, +0x34 timestamp,
+  +0x38 body size, +0x3E flags `(type << 7) | world`, bit 15 = unread. Built by slot 0x438; name encoded by polcore
+  `83EC085355568B7424185768453E271C`; decoded by slot 0x48C(out, name).
+- Types: **1** [FWT] friend request, **9** [FOK] accepted reply, **10** declined reply, **17** [GRP].
+- Network operations the addon replaces: 0x444/0x448 send + poll, 0x44C/0x450 reply + poll, 0x454 release,
+  0x460/0x464 delete + poll, 0x298 friend-list sync poll.
+- Own account id: global read by slot 0x46C. Own handle record: slot 0x2F8 (index) / 0x2B4 (0x28-byte records,
+  +0 id, +8 name); the name must be non-empty or sending fails with error 7.
+- Error display chain for negative POL results: 0x1cb80f0 -> 0x1cb7f90 -> 0x1db3890 -> 0x1d97200 -> 0x1d92340.

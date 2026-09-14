@@ -39,3 +39,34 @@ Screenshots are in `docs/screenshots/`. The server-side view was captured with `
 - Using the native menu's row actions (tell, invite, delete) on an injected entry.
 - More than one friend at once through the server (the probe with 5 injected entries rendered correctly, see `02`).
 - A remote (non-localhost) friendsd with `--no-trust-local`.
+
+# Retail parity verification, 2026-09-13
+
+Local LSB only. Same setup as above; every step used the game's own menus, driven by injected key
+presses. The UI flows below are the retail PlayOnline ones, not addon commands.
+
+| Retail feature | What happened in the native client | Evidence |
+|---|---|---|
+| Messages window | Main menu > Communication > Friend List > Messages lists mail with From / Type / Date; retail "Downloading data..." banner while loading | `09`, `10` |
+| Friend request arrives as mail | `/befriend` from the other player delivers a [FWT] message; opening it shows From / Title "友達になろうよ！" and **Accept / Decline / Ignore Sender / Leave Unread** with retail help text | `11`, `15` |
+| Accept | "Friend's Name:" prompt, then system line **"Accepted friend registration."**; the request is removed, a [FOK] reply is sent back, and the friend appears in To List as online with zone | `12`, `13`, `16` |
+| Decline | System line **"Declined friend registration."**; the request is removed and a decline reply is sent | `14` |
+| `/befriend <name>` | System line **"Requested friend registration."**; the friend shows under **Pending**; the target receives the [FWT] request | `17` |
+| Accepted reply | Requester receives [FOK] "フレンド登録承諾" with **Reply / Ignore Sender / Leave Unread / Exit** | `18` |
+| Away status | Friend row icon changes from the online globe to the Away face, and Send Message is disabled for an away friend | `19` |
+| Send Message | Row menu > Send Message, then text, then **"Message sent."**; the message (subject "FINAL FANTASY XI") reaches the friend's inbox through friendsd | chat log + server row |
+| Tell | Row menu > Tell opens "/tell Buddy" | earlier `rowsel` |
+| New-mail indicator | PlayOnline envelope icon appears in the Network panel when unread mail exists | `13` |
+
+## Bugs found and fixed while reaching parity
+
+- **Negative fetch results** from the list stub made FFXiMain queue a PlayOnline error per empty slot. Once the file layer was on,
+  that error loop blocked every message task ("Cannot do that action while processing another PlayOnline message.").
+  Empty slots now return a zeroed entry.
+- **Own account id and handle record** were empty on a private server; the game refused to list or send mail
+  ("Failed to send. (7)"). The addon now fills both from the server's character id.
+- **Recipient lookup** calls polcore's fetch directly, not through the list builder; without a table-level stub the game
+  failed with "Failed to send. (10)" after a restart.
+- **Network message operations** (send / reply / delete / friend sync) never complete without PlayOnline; they are
+  replaced with local file operations that the addon synchronises through friendsd.
+- Native `/befriend` must never reach polcore's network layer (it deadlocks the client); the addon handles it.

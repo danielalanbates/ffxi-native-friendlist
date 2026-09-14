@@ -11,6 +11,7 @@
 local M = {};
 
 local STATUS_ONLINE = 0x00002000;   -- +0x08 bits 13..15 = 1   -> "Online Friends"
+local STATUS_AWAY   = 0x00004000;   -- +0x08 bits 13..15 = 2   (still "Online Friends", away icon; verify)
 local IN_GAME       = 0x00010000;   -- +0x08 bit 16            -> character block present
 local PENDING       = 0x10000000;   -- +0x08 bit 28            -> "Pending"
 
@@ -41,7 +42,7 @@ function M.build(e, id, world)
 
     if (e.state == 'friend') then
         if (e.online) then
-            put(t, 0x08, u32(STATUS_ONLINE + IN_GAME));   -- character block index 0
+            put(t, 0x08, u32((e.away and STATUS_AWAY or STATUS_ONLINE) + IN_GAME));   -- character block index 0
             put(t, 0x1A, u16(1));                         -- block in use
             put(t, 0x1C, u16(e.zone or 0));
             t[0x1E + 1] = (world or 0) % 256;             -- same world as us
