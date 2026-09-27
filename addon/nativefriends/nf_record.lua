@@ -4,8 +4,8 @@
 * Layout recovered from FFXiMain.dll's accessor functions (see docs/CLIENT_INTERNALS.md).
 * Only the fields the menu actually consumes are written; everything else stays zero.
 *
-* Copyright (c) 2026 Daniel Bates. All rights reserved.
-* Licensed under PolyForm Noncommercial 1.0.0 with a 10% revenue-share rider - see LICENSE.
+* Copyright (c) 2026 Daniel Bates / Bates LLC.
+* Licensed under the MIT License - see LICENSE.
 ]]--
 
 local M = {};

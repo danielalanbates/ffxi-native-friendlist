@@ -68,5 +68,5 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for known gaps (the menu's own Add/Remove
 display, message-of-the-day) and the continuation pathways, including a native LSB module.
 
 ---
-Copyright (c) 2026 Daniel Bates / Bates LLC. All rights reserved. PolyForm Noncommercial 1.0.0
-with a 10% commercial revenue rider ([LICENSE](LICENSE)). https://batesai.org · help@batesai.org
+Copyright (c) 2026 Daniel Bates / Bates LLC. MIT License ([LICENSE](LICENSE)).
+https://batesai.org · help@batesai.org
