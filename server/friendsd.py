@@ -8,10 +8,14 @@ game's built-in Friend List menu.
 Wire format is deliberately trivial (plain text, one record per line) so the addon needs no
 JSON library:
 
-    GET /v1/list?name=<char>                 -> lines  F|<name>|<state>|<online>|<zone>|<job>|<lvl>
+    GET /v1/list?name=<char>                 -> lines  F|<name>|<state>|<online>|<zone>|<job>|<lvl>|<status 0 online,1 away>|<charid>
     GET /v1/request?name=<char>&target=<c>   -> OK|<message>  or  ERR|<message>
     GET /v1/accept?name=<char>&target=<c>
     GET /v1/remove?name=<char>&target=<c>    (also declines / cancels a pending request)
+    GET /v1/status?name=<char>&status=online|away|invisible
+    GET /v1/mail/send?name=<char>&to=<charid>&file=<native filename>&body=<hex>
+    GET /v1/mail/list?name=<char>            -> lines  M|<id>|<filename>|<hex body>
+    GET /v1/mail/ack?name=<char>&id=<id>     (delivered; remove from server)
 
 state is friend | incoming | outgoing.
 
@@ -43,6 +47,26 @@ CREATE TABLE IF NOT EXISTS nf_friends (
     KEY friendid (friendid)
 )
 """
+STATUS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS nf_status (
+    charid  INT UNSIGNED NOT NULL PRIMARY KEY,
+    status  TINYINT      NOT NULL DEFAULT 0,
+    updated DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)
+"""
+MAIL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS nf_mail (
+    id        INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    to_id     INT UNSIGNED NOT NULL,
+    from_id   INT UNSIGNED NOT NULL,
+    filename  VARCHAR(128) NOT NULL,
+    body      BLOB         NOT NULL,
+    created   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY to_id (to_id)
+)
+"""
+MAX_BODY = 0x1400   # subject (0x7F) + separator + text (0xFFF) + slack
+STATUSES = {'online': 0, 'away': 1, 'invisible': 2}
 # A row (a, b, accepted=0) is a request from a to b. On acceptance both directions exist with
 # accepted=1, so every query is "rows where charid = me".
 
@@ -54,6 +78,8 @@ class Store:
         self.cfg = cfg
         with self.cursor() as c:
             c.execute(SCHEMA)
+            c.execute(STATUS_SCHEMA)
+            c.execute(MAIL_SCHEMA)
 
     @contextlib.contextmanager
     def cursor(self):
@@ -82,9 +108,10 @@ class Store:
         return str(ipaddress.IPv4Address(struct.pack('<I', row[0])))
 
     def listing(self, me):
-        cols = """ch.charname, (s.charid IS NOT NULL), ch.pos_zone, st.mjob, st.mlvl"""
+        cols = """ch.charname, (s.charid IS NOT NULL), ch.pos_zone, st.mjob, st.mlvl, COALESCE(ns.status, 0), ch.charid"""
         joins = """LEFT JOIN accounts_sessions s ON s.charid = ch.charid
-                   LEFT JOIN char_stats st ON st.charid = ch.charid"""
+                   LEFT JOIN char_stats st ON st.charid = ch.charid
+                   LEFT JOIN nf_status ns ON ns.charid = ch.charid"""
         with self.cursor() as c:
             c.execute('SELECT f.accepted, ' + cols + ' FROM nf_friends f JOIN chars ch ON ch.charid = f.friendid '
                       + joins + ' WHERE f.charid = %s', (me,))
@@ -93,14 +120,18 @@ class Store:
                       + joins + ' WHERE f.friendid = %s AND f.accepted = 0', (me,))
             theirs = c.fetchall()
         out = []
-        for accepted, name, online, zone, job, lvl in mine:
+        for accepted, name, online, zone, job, lvl, status, cid in mine:
             if accepted:
-                out.append((name, 'friend', int(bool(online)), int(zone or 0), int(job or 0), int(lvl or 0)))
+                # Invisible looks exactly like offline to friends, as on retail.
+                if status == STATUSES['invisible']:
+                    online, status = 0, 0
+                out.append((name, 'friend', int(bool(online)), int(zone or 0) if online else 0,
+                            int(job or 0), int(lvl or 0), int(status) if online else 0, int(cid)))
             else:
-                out.append((name, 'outgoing', 0, 0, 0, 0))
+                out.append((name, 'outgoing', 0, 0, 0, 0, 0, int(cid)))
         # Presence stays hidden until the friendship is mutual.
-        for _, name, _online, _zone, _job, _lvl in theirs:
-            out.append((name, 'incoming', 0, 0, 0, 0))
+        for _, name, _online, _zone, _job, _lvl, _status, cid in theirs:
+            out.append((name, 'incoming', 0, 0, 0, 0, 0, int(cid)))
         return out
 
     def count(self, me):
@@ -172,8 +203,44 @@ def make_handler(store, trust_local):
                 return self.reply(403, 'ERR|not your character\n')
 
             if url.path == '/v1/list':
-                lines = ['F|%s|%s|%d|%d|%d|%d' % r for r in store.listing(me)]
+                lines = ['S|%d' % me] + ['F|%s|%s|%d|%d|%d|%d|%d|%d' % r for r in store.listing(me)]
                 return self.reply(200, '\n'.join(lines) + ('\n' if lines else ''))
+
+            if url.path == '/v1/mail/send':
+                try:
+                    to_id = int(q.get('to', '0'))
+                    body = bytes.fromhex(q.get('body', ''))
+                except ValueError:
+                    return self.reply(200, 'ERR|bad mail\n')
+                fname = q.get('file', '')
+                if not (0 < len(fname) <= 128) or len(body) > MAX_BODY or '/' in fname or '\\' in fname or '..' in fname:
+                    return self.reply(200, 'ERR|bad mail\n')
+                with store.cursor() as c:
+                    c.execute('SELECT 1 FROM chars WHERE charid = %s', (to_id,))
+                    if not c.fetchone():
+                        return self.reply(200, 'ERR|no such recipient\n')
+                    c.execute('INSERT INTO nf_mail (to_id, from_id, filename, body) VALUES (%s, %s, %s, %s)',
+                              (to_id, me, fname, body))
+                return self.reply(200, 'OK|sent\n')
+
+            if url.path == '/v1/mail/list':
+                with store.cursor() as c:
+                    c.execute('SELECT id, filename, body FROM nf_mail WHERE to_id = %s ORDER BY id LIMIT 50', (me,))
+                    rows = c.fetchall()
+                return self.reply(200, ''.join('M|%d|%s|%s\n' % (i, f, bytes(b).hex()) for i, f, b in rows))
+
+            if url.path == '/v1/mail/ack':
+                with store.cursor() as c:
+                    c.execute('DELETE FROM nf_mail WHERE to_id = %s AND id = %s', (me, int(q.get('id', '0'))))
+                return self.reply(200, 'OK|ack\n')
+
+            if url.path == '/v1/status':
+                value = STATUSES.get(q.get('status', ''))
+                if value is None:
+                    return self.reply(200, 'ERR|status must be online, away or invisible\n')
+                with store.cursor() as c:
+                    c.execute('REPLACE INTO nf_status (charid, status) VALUES (%s, %s)', (me, value))
+                return self.reply(200, 'OK|%s|%s\n' % (myname, q['status']))
 
             target, tname = store.charid(q.get('target', ''))
             if url.path in ('/v1/request', '/v1/accept', '/v1/remove'):
@@ -183,7 +250,7 @@ def make_handler(store, trust_local):
                     return self.reply(200, 'ERR|that is you\n')
                 fn = {'/v1/request': store.request, '/v1/accept': store.accept, '/v1/remove': store.remove}[url.path]
                 status, msg = fn(me, target)
-                return self.reply(200, '%s|%s|%s\n' % (status, tname, msg))
+                return self.reply(200, '%s|%s|%s|%d\n' % (status, tname, msg, target))
             return self.reply(404, 'ERR|no such endpoint\n')
 
     return Handler
