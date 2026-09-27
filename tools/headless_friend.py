@@ -17,8 +17,8 @@ then ends 60 s later, exactly like a disconnect.
 
 Only ever point this at your own local server.
 
-Copyright (c) 2026 Daniel Bates. All rights reserved.
-Licensed under PolyForm Noncommercial 1.0.0 with a 10% revenue-share rider - see LICENSE.
+Copyright (c) 2026 Daniel Bates / Bates LLC.
+Licensed under the MIT License - see LICENSE.
 """
 import os
 import sys

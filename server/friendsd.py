@@ -19,8 +19,8 @@ Authentication: a request acting for <char> is only honoured when <char> is logg
 map server from the same IP address the request comes from (accounts_sessions.client_addr).
 Nobody can read or edit another player's list without being logged in as them.
 
-Copyright (c) 2026 Daniel Bates. All rights reserved.
-Licensed under PolyForm Noncommercial 1.0.0 with a 10% revenue-share rider - see LICENSE.
+Copyright (c) 2026 Daniel Bates / Bates LLC.
+Licensed under the MIT License - see LICENSE.
 batesai.org - help@batesai.org
 """
 import argparse

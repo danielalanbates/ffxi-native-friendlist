@@ -7,8 +7,8 @@
 * registered." This addon redirects that one fetch to entries it builds from a friendsd server
 * (see ../../server), so the real menu shows real friends with live presence.
 *
-* Copyright (c) 2026 Daniel Bates. All rights reserved.
-* Licensed under PolyForm Noncommercial 1.0.0 with a 10% revenue-share rider - see LICENSE.
+* Copyright (c) 2026 Daniel Bates / Bates LLC.
+* Licensed under the MIT License - see LICENSE.
 * batesai.org - help@batesai.org
 ]]--
 

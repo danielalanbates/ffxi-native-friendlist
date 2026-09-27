@@ -4,8 +4,8 @@
 * The game thread must never wait on the network, so every request is a small state machine:
 * connect (non-blocking), send, read until the server closes, then call back.
 *
-* Copyright (c) 2026 Daniel Bates. All rights reserved.
-* Licensed under PolyForm Noncommercial 1.0.0 with a 10% revenue-share rider - see LICENSE.
+* Copyright (c) 2026 Daniel Bates / Bates LLC.
+* Licensed under the MIT License - see LICENSE.
 ]]--
 
 local install = AshitaCore:GetInstallPath():gsub('\\$', '');
