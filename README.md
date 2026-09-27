@@ -1,5 +1,14 @@
 # FFXI Native Friend List
 
+> **Archived, 2026-09-26.** Development is paused. LandSandBoat is building a friend list
+> into the server itself: the `xi_profile` server in
+> [LandSandBoat/server#11624](https://github.com/LandSandBoat/server/pull/11624),
+> [#11625](https://github.com/LandSandBoat/server/pull/11625) and
+> [#11632](https://github.com/LandSandBoat/server/pull/11632), together with
+> [LandSandBoat/xiloader#55](https://github.com/LandSandBoat/xiloader/pull/55). It needs no client-side
+> addon, which this project's approach can't avoid. The code below still works on the LSB build it
+> was verified against, and it is MIT-licensed if anyone wants to pick it up.
+
 Final Fantasy XI's **own** Friend List menu, working on LandSandBoat private servers. This isn't
 an overlay: the real menu opened by `/friendlist` shows your friends in its native Online, Offline,
 and Pending categories, with the character name and current zone that the client renders itself.
